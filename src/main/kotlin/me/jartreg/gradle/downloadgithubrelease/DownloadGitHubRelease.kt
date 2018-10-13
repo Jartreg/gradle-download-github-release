@@ -1,16 +1,16 @@
 package me.jartreg.gradle.downloadgithubrelease
 
+import me.jartreg.gradle.downloadgithubrelease.internal.GitHubReleaseDownloadAction
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import okio.Okio.buffer
-import okio.Okio.sink
 import org.gradle.api.DefaultTask
 import org.gradle.api.Transformer
 import org.gradle.api.tasks.*
+import org.gradle.internal.logging.progress.ProgressLoggerFactory
 import org.kohsuke.github.GitHub
 import java.io.File
+import javax.inject.Inject
 
-open class DownloadGitHubRelease : DefaultTask() {
+open class DownloadGitHubRelease @Inject constructor(private val progressLoggerFactory: ProgressLoggerFactory) : DefaultTask() {
     @Input
     var repository: String = ""
 
@@ -33,30 +33,18 @@ open class DownloadGitHubRelease : DefaultTask() {
 
     @TaskAction
     fun download() {
-        val repository = GitHub.connectAnonymously().getRepository(repository)
-
-        val release = if(tagName == null) {
-            repository.latestRelease
-        } else {
-            repository.getReleaseByTagName(tagName) ?: throw NoSuchElementException("Release `$tagName` could not be found")
+        if(project.gradle.startParameter.isOffline) {
+            throw IllegalStateException("Unable to download in offline mode")
         }
 
         val dest = project.file(computedDestination)
         if(!dest.isDirectory)
             dest.mkdirs()
 
+        val gitHub = GitHub.connectAnonymously()
         val client = OkHttpClient()
-        release.assets.forEach { asset ->
-            val req = Request.Builder()
-                    .url(asset.url)
-                    .header("Accept", "application/octet-stream")
-                    .build()
 
-            client.newCall(req).execute().use { res ->
-                buffer(sink(File(dest, asset.name))).use {
-                    it.writeAll(res.body()!!.source())
-                }
-            }
-        }
+        GitHubReleaseDownloadAction(gitHub, client, project.logger, progressLoggerFactory)
+                .download(repository, tagName, dest, renamingAction)
     }
 }
