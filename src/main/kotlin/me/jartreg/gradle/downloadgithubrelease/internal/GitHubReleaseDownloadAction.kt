@@ -18,31 +18,33 @@ class GitHubReleaseDownloadAction(
         val progress = progressLoggerFactory.newOperation(GitHubReleaseDownloadAction::class.java)
         progress.start("Download assets for ${tagName ?: "latest"}", "fetching release information")
 
-        val release = if (tagName == null) {
-            getLatestRelease(client, repositoryName)
-        } else {
-            getReleaseByTag(client, repositoryName, tagName)
-        }
+        try {
+            val release = if (tagName == null) {
+                getLatestRelease(client, repositoryName)
+            } else {
+                getReleaseByTag(client, repositoryName, tagName)
+            }
 
-        release.assets.forEach { asset ->
-            val destinationFile = File(destination, nameTransformer?.transform(asset.name) ?: asset.name)
-            logger.info("Download ${asset.name} to ${destinationFile.absolutePath}")
+            release.assets.forEach { asset ->
+                val destinationFile = File(destination, nameTransformer?.transform(asset.name) ?: asset.name)
+                logger.info("Download ${asset.name} to ${destinationFile.absolutePath}")
 
-            val req = Request.Builder()
-                    .url(asset.url)
-                    .header("Accept", "application/octet-stream")
-                    .build()
+                val req = Request.Builder()
+                        .url(asset.url)
+                        .header("Accept", "application/octet-stream")
+                        .build()
 
-            client.newCall(req).execute().use { res ->
-                progress.progress("0 B/${asset.size.toSizeString()}")
-                val source = ProgressSource(progress, res.body()!!.source(), asset.size)
+                client.newCall(req).execute().use { res ->
+                    progress.progress("0 B/${asset.size.toSizeString()}")
+                    val source = ProgressSource(progress, res.body()!!.source(), asset.size)
 
-                Okio.buffer(Okio.sink(destinationFile)).use {
-                    it.writeAll(source)
+                    Okio.buffer(Okio.sink(destinationFile)).use {
+                        it.writeAll(source)
+                    }
                 }
             }
+        } finally {
+            progress.completed()
         }
-
-        progress.completed()
     }
 }
