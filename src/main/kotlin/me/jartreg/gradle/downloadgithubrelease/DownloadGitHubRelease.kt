@@ -6,7 +6,6 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.Transformer
 import org.gradle.api.tasks.*
 import org.gradle.internal.logging.progress.ProgressLoggerFactory
-import org.kohsuke.github.GitHub
 import java.io.File
 import javax.inject.Inject
 
@@ -41,10 +40,7 @@ open class DownloadGitHubRelease @Inject constructor(private val progressLoggerF
         if(!dest.isDirectory)
             dest.mkdirs()
 
-        val gitHub = GitHub.connectAnonymously()
-        val client = OkHttpClient()
-
-        GitHubReleaseDownloadAction(gitHub, client, project.logger, progressLoggerFactory)
+        GitHubReleaseDownloadAction(OkHttpClient(), project.logger, progressLoggerFactory)
                 .download(repository, tagName, dest, renamingAction)
     }
 }

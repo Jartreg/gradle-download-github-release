@@ -2,15 +2,13 @@ package me.jartreg.gradle.downloadgithubrelease.internal
 
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okio.*
+import okio.Okio
 import org.gradle.api.Transformer
 import org.gradle.api.logging.Logger
 import org.gradle.internal.logging.progress.ProgressLoggerFactory
-import org.kohsuke.github.GitHub
 import java.io.File
 
 class GitHubReleaseDownloadAction(
-        private val gitHub: GitHub,
         private val client: OkHttpClient,
         private val logger: Logger,
         private val progressLoggerFactory: ProgressLoggerFactory
@@ -20,11 +18,10 @@ class GitHubReleaseDownloadAction(
         val progress = progressLoggerFactory.newOperation(GitHubReleaseDownloadAction::class.java)
         progress.start("Download assets for ${tagName ?: "latest"}", "fetching release information")
 
-        val repository = gitHub.getRepository(repositoryName)
-        val release = if(tagName == null) {
-            repository.latestRelease
+        val release = if (tagName == null) {
+            getLatestRelease(client, repositoryName)
         } else {
-            repository.getReleaseByTagName(tagName) ?: throw NoSuchElementException("Release `$tagName` could not be found")
+            getReleaseByTag(client, repositoryName, tagName)
         }
 
         release.assets.forEach { asset ->
@@ -37,14 +34,8 @@ class GitHubReleaseDownloadAction(
                     .build()
 
             client.newCall(req).execute().use { res ->
-                val body = res.body()!!
-                val size = body.contentLength().takeIf { it != -1L }
-
-                var source: Source = body.source()
-                if(size != null) {
-                    progress.progress("0 B/${size.toSizeString()}")
-                    source = ProgressSource(progress, source, size)
-                }
+                progress.progress("0 B/${asset.size.toSizeString()}")
+                val source = ProgressSource(progress, res.body()!!.source(), asset.size)
 
                 Okio.buffer(Okio.sink(destinationFile)).use {
                     it.writeAll(source)
