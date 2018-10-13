@@ -7,6 +7,7 @@ import org.gradle.api.Transformer
 import org.gradle.api.logging.Logger
 import org.gradle.internal.logging.progress.ProgressLoggerFactory
 import java.io.File
+import java.lang.Exception
 
 class GitHubReleaseDownloadAction(
         private val client: OkHttpClient,
@@ -35,6 +36,11 @@ class GitHubReleaseDownloadAction(
                         .build()
 
                 client.newCall(req).execute().use { res ->
+                    // Throw if the request failed
+                    if(!res.isSuccessful) {
+                        throw Exception("Could not download ${asset.name}. Response: ${res.code()} ${res.message()}")
+                    }
+
                     progress.progress("0 B/${asset.size.toSizeString()}")
                     val source = ProgressSource(progress, res.body()!!.source(), asset.size)
 
