@@ -99,6 +99,6 @@ private fun executeRequest(client: OkHttpClient, req: Request): GitHubRelease {
         if (res.isSuccessful)
             releaseAdapter.fromJson(res.body()!!.source())
         else
-            null
-    } ?: throw Exception("Could not fetch release information")
+            throw Exception("Could not fetch release information. Response: ${res.code()} ${res.message()}")
+    } ?: throw Exception("Could not parse release information")
 }
